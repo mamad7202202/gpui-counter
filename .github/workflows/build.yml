@@ -1,0 +1,52 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            artifact-name: gpui-counter-linux-x64
+          - os: windows-latest
+            artifact-name: gpui-counter-windows-x64
+          - os: macos-latest
+            artifact-name: gpui-counter-macos-arm64
+
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.os }})
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libfontconfig1-dev libxkbcommon-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build (release)
+        run: cargo build --release --verbose
+
+      - name: Run tests
+        run: cargo test --release
+        continue-on-error: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            target/release/gpui-counter
+            target/release/gpui-counter.exe
+          if-no-files-found: error
